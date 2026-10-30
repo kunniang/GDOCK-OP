@@ -1,7 +1,6 @@
-
 #=================================================
 #   Description: Build G-DOCK FROM LEAN'S LEDE
-#   Author: JK
+#   Author: JK (Optimized)
 #=================================================
 
 name: Build G-DOCK
@@ -9,158 +8,85 @@ name: Build G-DOCK
 on:
   release:
     types: [published]
-
   push:
     branches:
       - master
-
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     steps:
-    # Checkout source code
     - name: Checkout
       uses: actions/checkout@v4
 
-    # Check build environment
-    - name: Check Ubuntu version
+    - name: Free Disk Space
       run: |
-        echo "===== Ubuntu Version ====="
-        cat /etc/os-release
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        docker rmi $(docker images -q) 2>/dev/null || true
+        sudo apt-get clean
+        df -h
 
-        echo "===== CMake Version ====="
-        cmake --version
-
-        echo "===== GCC Version ====="
-        gcc --version
-
-    # Clean up Docker images
-    - name: Clean up Docker images
-      run: |
-        images=$(docker images -q)
-
-        if [ -n "$images" ]; then
-          docker rmi $images
-        else
-          echo "No Docker images to remove"
-        fi
-
-    # Install build dependencies
     - name: Install dependencies
       run: |
         sudo -E apt-get update
-
         sudo -E apt-get -y install \
-          ack antlr3 asciidoc autoconf automake autopoint \
-          binutils bison build-essential bzip2 ccache clang cmake \
-          cpio curl device-tree-compiler flex gawk gcc-multilib \
-          g++-multilib gettext genisoimage git gperf haveged \
-          help2man intltool libc6-dev-i386 libelf-dev libfuse-dev \
-          libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev \
-          libmpfr-dev libncurses5-dev libncursesw5-dev \
-          libpython3-dev libreadline-dev libssl-dev libtool \
-          llvm lrzsz msmtp ninja-build p7zip p7zip-full patch \
-          pkgconf python3 python3-pyelftools python3-setuptools \
-          qemu-utils rsync scons squashfs-tools subversion swig \
-          texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib \
+          g++-multilib gettext genisoimage git gperf haveged help2man intltool \
+          libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp-dev libltdl-dev \
+          libmpc-dev libmpfr-dev libncurses-dev libncurses5-dev libncursesw5-dev \
+          libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz msmtp ninja-build \
+          p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools \
+          qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+          upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 
-    # Clone LEDE source code
     - name: Clone source code
       run: |
-        git clone https://github.com/coolsnowwolf/lede lede
+        git clone --depth 1 https://github.com/coolsnowwolf/lede lede
 
-    # Update feeds
-    - name: Update feeds
+    - name: Run DIY script & Update Feeds
       run: |
         cd lede
-        ./scripts/feeds update -a
-
-    # Install feeds
-    - name: Install feeds
-      run: |
-        cd lede
-        ./scripts/feeds install -a
-
-    # Load custom configuration and fix dwarves
-    - name: Load custom configuration
-      run: |
-        set -e
-
-        echo "===== Load custom configuration ====="
-
-        cp -f gdockfull128.config ./lede/.config
-        chmod +x diy.sh
-
-        cd lede
-
+        # 执行外层 diy.sh 修改源与配置
+        chmod +x ../diy.sh
         ../diy.sh
 
-        echo "===== Fix dwarves CMake compatibility ====="
+        # 更新并安装 Feeds（必须在追加源之后执行）
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
-        mkdir -p tools/dwarves/patches
-
-        printf '%s\n' \
-          '--- a/CMakeLists.txt' \
-          '+++ b/CMakeLists.txt' \
-          '@@ -1 +1 @@' \
-          '-cmake_minimum_required(VERSION 2.8.12)' \
-          '+cmake_minimum_required(VERSION 3.5)' \
-          > tools/dwarves/patches/001-cmake-minimum-version.patch
-
-        echo "===== Verify patch file ====="
-
-        cat tools/dwarves/patches/001-cmake-minimum-version.patch
-
-        test -s tools/dwarves/patches/001-cmake-minimum-version.patch
-
-        echo "===== Run make defconfig ====="
-
+    - name: Load custom configuration
+      run: |
+        cd lede
+        cp -f ../gdockfull128.config .config
         make defconfig
 
-        echo "===== Configuration completed ====="
-
-
-    - name: Verify build configuration
-      run: |
-        cd lede
-
-        echo "===== Check .config ====="
-        test -s .config
-
-        echo "===== Check dwarves patch ====="
-        test -s tools/dwarves/patches/001-cmake-minimum-version.patch
-
-        echo "===== Configuration verification passed ====="
-
-
-    # Download packages
     - name: Download package
       run: |
-        echo -e "$(nproc) thread build."
-
         cd lede
-
-        make download -j$(nproc)
-
+        make download -j8
         find dl -size -1024c -exec ls -l {} \;
-
         find dl -size -1024c -exec rm -f {} \;
 
-    # Build firmware
-    - name: Build
+    - name: Build firmware
       run: |
         cd lede
-
         echo -e "$(nproc) thread build."
+        make -j$(nproc) || make -j1 V=s
 
-        make -j$(nproc) V=s
+    - name: Prepare artifact
+      run: |
+        cd lede/bin/targets/ipq40xx/generic
+        rm -rf packages
+        echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
 
-    # Upload build artifacts
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: G-DOCK
-        path: ./lede/bin
+        name: G-DOCK-R619AC-128M
+        path: ${{ env.FIRMWARE_PATH }}
