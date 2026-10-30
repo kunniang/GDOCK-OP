@@ -87,8 +87,11 @@ jobs:
     # Load custom configuration and fix dwarves
     - name: Load custom configuration
       run: |
-        cp -f gdockfull128.config ./lede/.config
+        set -e
 
+        echo "===== Load custom configuration ====="
+
+        cp -f gdockfull128.config ./lede/.config
         chmod +x diy.sh
 
         cd lede
@@ -99,17 +102,39 @@ jobs:
 
         mkdir -p tools/dwarves/patches
 
-        cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1 +1 @@
--cmake_minimum_required(VERSION 2.8.12)
-+cmake_minimum_required(VERSION 3.5)
-EOF
+        printf '%s\n' \
+          '--- a/CMakeLists.txt' \
+          '+++ b/CMakeLists.txt' \
+          '@@ -1 +1 @@' \
+          '-cmake_minimum_required(VERSION 2.8.12)' \
+          '+cmake_minimum_required(VERSION 3.5)' \
+          > tools/dwarves/patches/001-cmake-minimum-version.patch
 
-        echo "===== dwarves patch created ====="
+        echo "===== Verify patch file ====="
+
+        cat tools/dwarves/patches/001-cmake-minimum-version.patch
+
+        test -s tools/dwarves/patches/001-cmake-minimum-version.patch
+
+        echo "===== Run make defconfig ====="
 
         make defconfig
+
+        echo "===== Configuration completed ====="
+
+
+    - name: Verify build configuration
+      run: |
+        cd lede
+
+        echo "===== Check .config ====="
+        test -s .config
+
+        echo "===== Check dwarves patch ====="
+        test -s tools/dwarves/patches/001-cmake-minimum-version.patch
+
+        echo "===== Configuration verification passed ====="
+
 
     # Download packages
     - name: Download package
