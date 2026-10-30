@@ -1,40 +1,26 @@
-echo '修改机器名称'
+#!/bin/bash
+#=================================================
+# Description: DIY script for G-DOCK (R619AC)
+#=================================================
+
+# 1. 添加 Passwall 及其依赖源到 feeds.conf.default
+sed -i '$a src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main' feeds.conf.default
+sed -i '$a src-git passwall_luci https://github.com/xiaorouji/openwrt-passwall.git;luci-smartdns-dev' feeds.conf.default
+
+# 2. 修改默认主机名
 sed -i 's/OpenWrt/G-DOCK/g' package/base-files/files/bin/config_generate
 
-#echo '修改网关地址'
-#sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
-
-echo '修改时区'
+# 3. 修改时区为中国标准时间 (CST-8)
 sed -i "s/'UTC'/'CST-8'\n        set system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
 
-echo '修改默认主题'
-sed -i 's/config internal themes/config internal themes\n    option Argon  \"\/luci-static\/argon\"/g' feeds/luci/modules/luci-base/root/etc/config/luci
+# 4. 替换/设置自定义 Banner（如果外层有 banner 文件）
+if [ -f "../banner" ]; then
+    rm -rf package/base-files/files/etc/banner
+    cp -f ../banner package/base-files/files/etc/
+fi
 
-echo '去除默认bootstrap主题'
-sed -i '/set luci.main.mediaurlbase=\/luci-static\/bootstrap/d' feeds/luci/themes/luci-theme-bootstrap/root/etc/uci-defaults/30_luci-theme-bootstrap
-
-echo '删除旧版argon,链接新版'
-rm -rf ./package/lean/luci-theme-argon
-ln -s ../../../luci-theme-argon ./package/lean/
-
-echo '修改wifi名称'
-sed -i 's/OpenWrt/G-DOCK/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
-
-echo '修改banner'
-rm -rf package/base-files/files/etc/banner
-cp -f ../banner package/base-files/files/etc/
-
-echo '下载ServerChan'
-git clone https://github.com/tty228/luci-app-serverchan ../diy/luci-app-serverchan
-
-echo '集成diy目录'
-ln -s ../../diy ./package/openwrt-packages
-
-
-echo '修复 dwarves 与新版 CMake 的兼容性'
-
+# 5. 修复 dwarves 与 CMake 语法兼容
 mkdir -p tools/dwarves/patches
-
 cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
@@ -42,5 +28,3 @@ cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
 -cmake_minimum_required(VERSION 2.8.12)
 +cmake_minimum_required(VERSION 3.5)
 EOF
-
-
