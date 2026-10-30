@@ -3,9 +3,10 @@
 # Description: DIY script for G-DOCK (R619AC)
 #=================================================
 
-# 1. 添加 Passwall 及其依赖源到 feeds.conf.default
-sed -i '$a src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main' feeds.conf.default
-sed -i '$a src-git passwall_luci https://github.com/xiaorouji/openwrt-passwall.git;luci-smartdns-dev' feeds.conf.default
+# 1. 安全添加 Passwall 源（指向稳定 main 分支）
+sed -i '/passwall/d' feeds.conf.default
+echo 'src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main' >> feeds.conf.default
+echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main' >> feeds.conf.default
 
 # 2. 修改默认主机名
 sed -i 's/OpenWrt/G-DOCK/g' package/base-files/files/bin/config_generate
