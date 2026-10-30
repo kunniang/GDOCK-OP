@@ -31,4 +31,16 @@ echo '集成diy目录'
 ln -s ../../diy ./package/openwrt-packages
 
 
+echo '修复 dwarves 与新版 CMake 的兼容性'
+
+mkdir -p tools/dwarves/patches
+
+cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1 +1 @@
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.5)
+EOF
+
 
