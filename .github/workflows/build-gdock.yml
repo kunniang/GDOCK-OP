@@ -65,6 +65,8 @@ jobs:
         cd lede
         cp -f ../gdockfull128.config .config
         make defconfig
+        # 检查是否成功锁定了 r619ac 设备
+        grep -i "r619ac" .config || (echo "Error: R619AC device profile not matched!" && exit 1)
 
     - name: Download package
       run: |
