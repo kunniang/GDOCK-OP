@@ -53,12 +53,20 @@ jobs:
     - name: Run DIY script & Update Feeds
       run: |
         cd lede
-        # 执行外层 diy.sh 修改源与配置
+        # 1. 执行外层 diy.sh 修改源与配置
         chmod +x ../diy.sh
         ../diy.sh
 
-        # 更新并安装 Feeds（必须在追加源之后执行）
+        # 2. 更新 Feeds 仓库索引
         ./scripts/feeds update -a
+
+        # 3. 在安装前安全移除自带的旧版本冲突包（加 || true 防止报错退出）
+        rm -rf feeds/packages/net/chinadns-ng || true
+        rm -rf feeds/packages/net/sing-box || true
+        rm -rf feeds/packages/net/xray-core || true
+        rm -rf feeds/packages/net/hysteria || true
+
+        # 4. 安装全部 Feeds
         ./scripts/feeds install -a
 
     - name: Load custom configuration
