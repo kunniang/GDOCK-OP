@@ -25,7 +25,10 @@ cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
 +cmake_minimum_required(VERSION 3.5)
 EOF
 
-# 5. 添加 PassWall 官方依赖包源与主程序源（先清理可能存在的重复行，再追加）
+# 5. 清理 feeds.conf.default 中可能残留的 passwall 行（防止干扰）
 sed -i '/passwall/d' feeds.conf.default
-echo 'src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main' >> feeds.conf.default
-echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main' >> feeds.conf.default
+
+# 6. 直接以本地 package 方式引入 passwall 依赖与主程序（最稳方案）
+rm -rf package/passwall package/passwall_packages
+git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages.git package/passwall_packages
+git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall.git package/passwall
