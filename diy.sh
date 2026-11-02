@@ -24,3 +24,12 @@ cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
 -cmake_minimum_required(VERSION 2.8.12)
 +cmake_minimum_required(VERSION 3.5)
 EOF
+
+# 5. 添加 PassWall 官方依赖包源与主程序源
+sed -i '$a src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main' feeds.conf.default
+sed -i '$a src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main' feeds.conf.default
+
+# 6. 清理可能导致冲突的旧依赖包
+rm -rf feeds/packages/net/chinadns-ng
+rm -rf feeds/packages/net/sing-box
+rm -rf feeds/packages/net/xray-core
