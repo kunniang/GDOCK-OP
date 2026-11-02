@@ -53,14 +53,14 @@ jobs:
     - name: Run DIY script & Update Feeds
       run: |
         cd lede
-        # 1. 执行外层 diy.sh 修改源与配置
+        # 1. 执行外层 diy.sh
         chmod +x ../diy.sh
         ../diy.sh
 
         # 2. 更新 Feeds 仓库索引
         ./scripts/feeds update -a
 
-        # 3. 在安装前安全移除自带的旧版本冲突包（加 || true 防止报错退出）
+        # 3. 此时 feeds 目录已经存在，安全移除自带的旧版本冲突包（末尾加 || true 保证零报错）
         rm -rf feeds/packages/net/chinadns-ng || true
         rm -rf feeds/packages/net/sing-box || true
         rm -rf feeds/packages/net/xray-core || true
@@ -68,6 +68,26 @@ jobs:
 
         # 4. 安装全部 Feeds
         ./scripts/feeds install -a
+
+    - name: Load custom configuration
+      run: |
+        cd lede
+        cp -f ../gdockfull128.config .config
+        
+        # 兼容性替换：自动纠正历史 config 文件中的多余 DEVICE_ 字符
+        sed -i 's/CONFIG_TARGET_DEVICE_ipq40xx/CONFIG_TARGET_ipq40xx/g' .config
+
+        # 确保竞斗云基础平台选中
+        echo "CONFIG_TARGET_ipq40xx=y" >> .config
+        echo "CONFIG_TARGET_ipq40xx_generic=y" >> .config
+
+        make defconfig
+
+        # 兼容匹配竞斗云机型符号（支持带或不带 -128m）
+        if ! grep -qE "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac(=y|-128m=y)" .config; then
+          echo "::error::未成功选中竞斗云 2.0 (p2w_r619ac) 目标机型，请检查 .config！"
+          exit 1
+        fi
 
     - name: Load custom configuration
       run: |
