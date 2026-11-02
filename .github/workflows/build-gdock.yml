@@ -114,11 +114,21 @@ jobs:
           exit 1
         fi
 
-        # 关键依赖自检：passwall 若被 defconfig 丢掉，这里直接报警
-        if ! grep -qE "^CONFIG_PACKAGE_luci-app-passwall=y" .config; then
-          echo "::error::luci-app-passwall 未被选中，请检查包名/依赖是否齐全"
-          exit 1
-        fi
+        # 关键取舍自检：避免编译一小时之后才发现配置没生效
+        for p in luci-app-passwall sing-box hysteria xray-core \
+                 kmod-usb-storage kmod-fs-ntfs3 kmod-fs-vfat kmod-fs-exfat; do
+          if ! grep -qE "^CONFIG_PACKAGE_${p}=y" .config; then
+            echo "::error::CONFIG_PACKAGE_${p} 没有被选中，请检查包名或依赖是否齐全"
+            exit 1
+          fi
+        done
+
+        for p in luci-app-ssr-plus wpad-basic-mbedtls ath10k-board-qca4019; do
+          if grep -qE "^CONFIG_PACKAGE_${p}=y" .config; then
+            echo "::error::CONFIG_PACKAGE_${p} 仍被启用，gdockfull128.config 里的 is not set 没生效"
+            exit 1
+          fi
+        done
 
     - name: Download package
       run: |
