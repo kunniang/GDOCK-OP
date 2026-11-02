@@ -77,11 +77,15 @@ jobs:
         # 兼容性替换：自动纠正历史 config 文件中的多余 DEVICE_ 字符
         sed -i 's/CONFIG_TARGET_DEVICE_ipq40xx/CONFIG_TARGET_ipq40xx/g' .config
 
+        # 确保竞斗云基础平台选中
+        echo "CONFIG_TARGET_ipq40xx=y" >> .config
+        echo "CONFIG_TARGET_ipq40xx_generic=y" >> .config
+
         make defconfig
 
-        # 校验当前选中的是不是竞斗云 128M，如果不匹配直接熔断报错，避免浪费半小时编译错固件
-        if ! grep -q "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac-128m=y" .config; then
-          echo "::error::未成功选中竞斗云 2.0 (p2w_r619ac-128m) 目标机型，请检查 .config！"
+        # 兼容匹配竞斗云机型符号（支持带或不带 -128m）
+        if ! grep -qE "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac(=y|-128m=y)" .config; then
+          echo "::error::未成功选中竞斗云 2.0 (p2w_r619ac) 目标机型，请检查 .config！"
           exit 1
         fi
 
