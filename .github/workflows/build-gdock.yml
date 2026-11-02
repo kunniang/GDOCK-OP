@@ -50,64 +50,73 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/coolsnowwolf/lede lede
 
-    - name: Run DIY script & Update Feeds
+    - name: Run DIY script
       run: |
         cd lede
-        # 1. 执行外层 diy.sh
         chmod +x ../diy.sh
         ../diy.sh
 
-        # 2. 更新并安装常规官方 Feeds
+    - name: Update and install feeds
+      run: |
+        cd lede
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-        # 3. 清理官方 feeds 中可能存在的同名旧依赖（优先使用 package/ 下的新版）
-        rm -rf feeds/packages/net/chinadns-ng || true
-        rm -rf feeds/packages/net/sing-box || true
-        rm -rf feeds/packages/net/xray-core || true
-        rm -rf feeds/packages/net/hysteria || true
+    - name: Clean conflicting feed packages
+      run: |
+        cd lede
+        # passwall 依赖的这批包在 feeds 里也有旧版本，会与 passwall 官方版本冲突，
+        # 需要连同 package/feeds 下的软链接一起删掉，否则会留下断链。
+        DEPS="chinadns-ng dns2socks geoview hysteria ipt2socks microsocks naiveproxy \
+              shadow-tls shadowsocks-rust shadowsocksr-libev simple-obfs sing-box \
+              smartdns tcping v2ray-geodata v2ray-plugin xray-core xray-plugin"
+        for p in $DEPS; do
+          rm -rf "feeds/packages/net/$p" "package/feeds/packages/$p"
+        done
+        rm -rf feeds/luci/applications/luci-app-passwall package/feeds/luci/luci-app-passwall
+
+    - name: Clone Passwall
+      run: |
+        cd lede
+        # 注意：passwall 已从 xiaorouji 账号迁移到 Openwrt-Passwall 组织，
+        # 旧的 https://github.com/xiaorouji/openwrt-passwall.git 已 404。
+        git clone --depth=1 -b main \
+          https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git package/passwall_packages
+        git clone --depth=1 -b main \
+          https://github.com/Openwrt-Passwall/openwrt-passwall.git package/passwall
+
+        # 校验克隆结果，避免后续 make 阶段才暴露问题
+        test -f package/passwall/luci-app-passwall/Makefile \
+          || { echo "::error::passwall luci 克隆失败或目录结构异常"; exit 1; }
+        test -d package/passwall_packages/sing-box \
+          || { echo "::error::passwall packages 克隆失败或目录结构异常"; exit 1; }
 
     - name: Load custom configuration
       run: |
         cd lede
         cp -f ../gdockfull128.config .config
-        
+
         # 兼容性替换：自动纠正历史 config 文件中的多余 DEVICE_ 字符
         sed -i 's/CONFIG_TARGET_DEVICE_ipq40xx/CONFIG_TARGET_ipq40xx/g' .config
 
-        # 确保竞斗云基础平台选中
-        echo "CONFIG_TARGET_ipq40xx=y" >> .config
-        echo "CONFIG_TARGET_ipq40xx_generic=y" >> .config
+        # 确保竞斗云基础平台与机型选中
+        {
+          echo "CONFIG_TARGET_ipq40xx=y"
+          echo "CONFIG_TARGET_ipq40xx_generic=y"
+          echo "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac=y"
+        } >> .config
 
         make defconfig
 
-        # 兼容匹配竞斗云机型符号（支持带或不带 -128m）
-        if ! grep -qE "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac(=y|-128m=y)" .config; then
-          echo "::error::未成功选中竞斗云 2.0 (p2w_r619ac) 目标机型，请检查 .config！"
+        # 兼容匹配竞斗云机型符号（只要包含 r619ac 且赋值为 y 即可）
+        if ! grep -qE "CONFIG_TARGET_.*_DEVICE_.*r619ac.*=y" .config; then
+          echo "::error::未成功选中竞斗云 (r619ac) 目标机型，请检查 .config！"
           exit 1
         fi
 
-    - name: Load custom configuration
-      run: |
-        cd lede
-        # 1. 复制外部配置文件
-        cp -f ../gdockfull128.config .config
-        
-        # 2. 自动修正历史 config 文件中多余的 DEVICE_ 前缀
-        sed -i 's/CONFIG_TARGET_DEVICE_ipq40xx/CONFIG_TARGET_ipq40xx/g' .config
-
-        # 3. 显式补正当前架构与机型定义
-        echo "CONFIG_TARGET_ipq40xx=y" >> .config
-        echo "CONFIG_TARGET_ipq40xx_generic=y" >> .config
-        echo "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac=y" >> .config
-        echo "CONFIG_TARGET_ipq40xx_generic_DEVICE_p2w_r619ac-128m=y" >> .config
-
-        # 4. 展开依赖配置
-        make defconfig
-
-        # 5. 兼容匹配竞斗云机型符号（只要包含 r619ac 且赋值为 y 即可，不再强制要求 -128m）
-        if ! grep -qE "CONFIG_TARGET_.*_DEVICE_.*r619ac.*=y" .config; then
-          echo "::error::未成功选中竞斗云 (r619ac) 目标机型，请检查 .config！"
+        # 关键依赖自检：passwall 若被 defconfig 丢掉，这里直接报警
+        if ! grep -qE "^CONFIG_PACKAGE_luci-app-passwall=y" .config; then
+          echo "::error::luci-app-passwall 未被选中，请检查包名/依赖是否齐全"
           exit 1
         fi
 
