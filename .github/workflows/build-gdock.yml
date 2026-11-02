@@ -57,17 +57,15 @@ jobs:
         chmod +x ../diy.sh
         ../diy.sh
 
-        # 2. 更新 Feeds 仓库索引
+        # 2. 更新并安装常规官方 Feeds
         ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
-        # 3. 此时 feeds 目录已经存在，安全移除自带的旧版本冲突包（末尾加 || true 保证零报错）
+        # 3. 清理官方 feeds 中可能存在的同名旧依赖（优先使用 package/ 下的新版）
         rm -rf feeds/packages/net/chinadns-ng || true
         rm -rf feeds/packages/net/sing-box || true
         rm -rf feeds/packages/net/xray-core || true
         rm -rf feeds/packages/net/hysteria || true
-
-        # 4. 安装全部 Feeds
-        ./scripts/feeds install -a
 
     - name: Load custom configuration
       run: |
