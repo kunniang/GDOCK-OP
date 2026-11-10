@@ -28,7 +28,7 @@ cat > tools/dwarves/patches/001-cmake-minimum-version.patch <<'EOF'
 +cmake_minimum_required(VERSION 3.5)
 EOF
 
-# 5. 清理 feeds.conf.default 中可能残留的 passwall 行（防止干扰）
+# 5. 清理 feeds.conf.default 中可能残留的 passwall 行（防止干扰） 
 sed -i '/passwall/d' feeds.conf.default
 
 # 6. 提示：passwall 主程序与依赖包已迁库
